@@ -35,6 +35,7 @@ describe('AppController', () => {
 
       appController.getHello();
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(Mapper.mapData).toHaveBeenCalledWith(
         MessageDto,
         resultFromService,
