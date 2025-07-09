@@ -6,9 +6,6 @@ import {
   AppBar,
   Box,
   Button,
-  Card,
-  CardActions,
-  CardContent,
   Container,
   CssBaseline,
   Paper,
@@ -20,11 +17,12 @@ import {
 import Grid from "@mui/material/Grid";
 import theme from "./theme";
 import { useMemo } from "react";
-import { ExampleService } from "./services/example.service";
+import { FileService } from "./services/file.service";
+import { FileUpload } from "./components/FileUpload";
 
 function App() {
-  const exampleService = useMemo(function initExampleService() {
-    return new ExampleService();
+  const fileService = useMemo(function initFileService() {
+    return new FileService();
   }, []);
 
   return (
@@ -46,77 +44,33 @@ function App() {
               <Grid size={12}>
                 <Paper sx={{ p: 2, mb: 3 }}>
                   <Typography variant="h4" gutterBottom>
-                    Benvenuto nell'applicazione
+                    File Upload & Download System
                   </Typography>
                   <Typography variant="body1" color="text.secondary">
-                    Questa è l'impostazione iniziale per l'app con Material-UI
-                    configurato correttamente.
+                    Upload files to AWS S3 and manage them with secure download links.
                   </Typography>
                 </Paper>
               </Grid>
 
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h5" component="div">
-                      Funzionalità 1
-                    </Typography>
-                    <Typography sx={{ mb: 1.5 }} color="text.secondary">
-                      Descrizione della prima funzionalità
-                    </Typography>
-                    <Typography variant="body2">
-                      Qui puoi aggiungere la tua prima funzionalità. Material-UI
-                      è ora configurato e funzionante.
-                    </Typography>
-                  </CardContent>
-                  <CardActions>
-                    <Button size="small">Scopri di più</Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h5" component="div">
-                      Funzionalità 2
-                    </Typography>
-                    <Typography sx={{ mb: 1.5 }} color="text.secondary">
-                      Descrizione della seconda funzionalità
-                    </Typography>
-                    <Typography variant="body2">
-                      Qui puoi aggiungere la tua seconda funzionalità. Tutti i
-                      componenti Material-UI sono disponibili.
-                    </Typography>
-                  </CardContent>
-                  <CardActions>
-                    <Button
-                      size="small"
-                      onClick={async () => {
-                        const { message } = await exampleService.getMessage();
-                        alert(message);
-                      }}
-                    >
-                      Cliccami per fare una chiamata API
-                    </Button>
-                  </CardActions>
-                </Card>
+              <Grid size={12}>
+                <FileUpload fileService={fileService} />
               </Grid>
 
               <Grid size={12}>
                 <Paper sx={{ p: 2 }}>
                   <Typography variant="h6" gutterBottom>
-                    Stato dell'applicazione
+                    System Status
                   </Typography>
                   <Typography variant="body2">
-                    ✅ Material-UI configurato correttamente
+                    ✅ File Upload to S3 configured
                     <br />
-                    ✅ Tema personalizzabile
+                    ✅ Secure Download URLs
                     <br />
-                    ✅ Font Roboto caricato
+                    ✅ File Management (Delete)
                     <br />
-                    ✅ Layout responsivo
-                    <br />✅ Componenti base implementati
+                    ✅ File Listing with Metadata
+                    <br />
+                    ✅ Material-UI Interface
                   </Typography>
                 </Paper>
               </Grid>
