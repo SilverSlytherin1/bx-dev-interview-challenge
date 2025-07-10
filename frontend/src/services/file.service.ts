@@ -14,19 +14,30 @@ export interface FileListResponse {
 
 export class FileService {
   private readonly baseUrl: string;
+  private getAuthHeaders: () => Record<string, string>;
 
-  constructor() {
+  constructor(getAuthHeaders: () => Record<string, string>) {
     // Since we have a proxy configured in rsbuild.config.ts, we can use relative URLs
     // The proxy will forward /api requests to http://localhost:3000
     this.baseUrl = '';
+    this.getAuthHeaders = getAuthHeaders;
   }
 
   async uploadFile(file: File): Promise<FileUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
 
+    const authHeaders = this.getAuthHeaders();
+    const headers: Record<string, string> = {};
+    
+    // Only add Authorization header, not Content-Type for FormData
+    if (authHeaders.Authorization) {
+      headers.Authorization = authHeaders.Authorization;
+    }
+
     const response = await fetch(`${this.baseUrl}/api/upload`, {
       method: 'POST',
+      headers,
       body: formData,
     });
 
@@ -38,7 +49,9 @@ export class FileService {
   }
 
   async listFiles(): Promise<FileListResponse> {
-    const response = await fetch(`${this.baseUrl}/api/files`);
+    const response = await fetch(`${this.baseUrl}/api/files`, {
+      headers: this.getAuthHeaders(),
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch files: ${response.statusText}`);
@@ -50,6 +63,7 @@ export class FileService {
   async deleteFile(fileId: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/api/files/${fileId}`, {
       method: 'DELETE',
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {

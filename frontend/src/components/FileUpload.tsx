@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from "react";
 import {
   Box,
   Button,
@@ -10,16 +10,19 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   Chip,
-} from '@mui/material';
-import { FileService, FileUploadResponse } from '../services/file.service';
+} from "@mui/material";
+import { FileService, FileUploadResponse } from "../services/file.service";
 
 interface FileUploadProps {
   fileService: FileService;
+  disabled?: boolean;
 }
 
-export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
+export const FileUpload: React.FC<FileUploadProps> = ({
+  fileService,
+  disabled = false,
+}) => {
   const [uploading, setUploading] = useState(false);
   const [files, setFiles] = useState<FileUploadResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -31,15 +34,17 @@ export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
       const response = await fileService.listFiles();
       setFiles(response.files);
     } catch (err) {
-      setError('Failed to load files');
-      console.error('Error loading files:', err);
+      setError("Failed to load files");
+      console.error("Error loading files:", err);
     }
   }, [fileService]);
 
   // Load files on component mount
   React.useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
+    if (!disabled) {
+      loadFiles();
+    }
+  }, [loadFiles, disabled]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -56,17 +61,17 @@ export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
     try {
       await fileService.uploadFile(file);
       setSuccess(`File "${file.name}" uploaded successfully!`);
-      
+
       // Refresh file list
       await loadFiles();
-      
+
       // Clear file input
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-      console.error('Upload error:', err);
+      setError(err instanceof Error ? err.message : "Upload failed");
+      console.error("Upload error:", err);
     } finally {
       setUploading(false);
     }
@@ -78,31 +83,31 @@ export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
       setSuccess(`File "${fileName}" deleted successfully!`);
       await loadFiles();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed');
-      console.error('Delete error:', err);
+      setError(err instanceof Error ? err.message : "Delete failed");
+      console.error("Delete error:", err);
     }
   };
 
   const handleDownload = (fileId: string) => {
     const downloadUrl = fileService.getDownloadUrl(fileId);
-    window.open(downloadUrl, '_blank');
+    window.open(downloadUrl, "_blank");
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -113,24 +118,29 @@ export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
         <Typography variant="h5" gutterBottom>
           File Upload
         </Typography>
-        
+
         <Box sx={{ mb: 2 }}>
           <input
             ref={fileInputRef}
             type="file"
             onChange={handleFileSelect}
-            style={{ display: 'none' }}
+            style={{ display: "none" }}
             id="file-input"
-            disabled={uploading}
+            disabled={uploading || disabled}
           />
           <label htmlFor="file-input">
             <Button
               variant="contained"
               component="span"
-              disabled={uploading}
+              disabled={uploading || disabled}
               size="large"
             >
-              📁 {uploading ? 'Uploading...' : 'Choose File to Upload'}
+              📁{" "}
+              {uploading
+                ? "Uploading..."
+                : disabled
+                ? "Please login to upload files"
+                : "Choose File to Upload"}
             </Button>
           </label>
         </Box>
@@ -151,7 +161,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
         )}
 
         {success && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+          <Alert
+            severity="success"
+            sx={{ mb: 2 }}
+            onClose={() => setSuccess(null)}
+          >
             {success}
           </Alert>
         )}
@@ -165,13 +179,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
 
         {files.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            No files uploaded yet. Upload your first file above!
+            {disabled
+              ? "Please login to view your uploaded files."
+              : "No files uploaded yet. Upload your first file above!"}
           </Typography>
         ) : (
           <List>
             {files.map((file) => (
               <ListItem key={file.id} divider>
-                <Box sx={{ mr: 2, fontSize: '1.5rem' }}>📄</Box>
+                <Box sx={{ mr: 2, fontSize: "1.5rem" }}>📄</Box>
                 <ListItemText
                   primary={file.originalName}
                   secondary={
@@ -194,12 +210,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
                     </Box>
                   }
                 />
-                <ListItemSecondaryAction>
+                <ListItem secondaryAction>
                   <IconButton
                     edge="end"
                     aria-label="download"
                     onClick={() => handleDownload(file.id)}
                     sx={{ mr: 1 }}
+                    disabled={disabled}
                   >
                     ⬇️
                   </IconButton>
@@ -208,10 +225,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ fileService }) => {
                     aria-label="delete"
                     onClick={() => handleDelete(file.id, file.originalName)}
                     color="error"
+                    disabled={disabled}
                   >
                     🗑️
                   </IconButton>
-                </ListItemSecondaryAction>
+                </ListItem>
               </ListItem>
             ))}
           </List>
