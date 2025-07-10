@@ -10,6 +10,8 @@ import {
   HttpException,
   HttpStatus,
   Res,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -17,6 +19,8 @@ import { IMessageDto, MessageDto } from '../dtos/message.dto';
 import { IFileUploadDto, FileUploadDto } from '../dtos/file-upload.dto';
 import { IFileListDto, FileListDto } from '../dtos/file-list.dto';
 import { AppService } from '../services/app/app.service';
+import { JwtAuthGuard } from '../services/auth/jwt-auth.guard';
+import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 import { Mapper } from '../utils/mapper/mapper';
 
 @Controller()
@@ -33,15 +37,18 @@ export class AppController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
+  @UseGuards(JwtAuthGuard)
   async uploadFile(
     @UploadedFile() file: Express.Multer.File,
+    @Request() req: AuthenticatedRequest,
   ): Promise<IFileUploadDto> {
     if (!file) {
       throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
     }
 
     try {
-      const entity = await this.appService.uploadFile(file);
+      const userId = req.user.id;
+      const entity = await this.appService.uploadFile(file, userId);
 
       // Map entity to DTO and include download URL
       const dto = new FileUploadDto(
@@ -70,9 +77,11 @@ export class AppController {
   }
 
   @Get('files')
-  async listFiles(): Promise<IFileListDto> {
+  @UseGuards(JwtAuthGuard)
+  async listFiles(@Request() req: AuthenticatedRequest): Promise<IFileListDto> {
     try {
-      const entities = await this.appService.listFiles();
+      const userId = req.user.id;
+      const entities = await this.appService.listFiles(userId);
 
       const fileDtos = entities.map(
         (entity) =>
@@ -103,12 +112,15 @@ export class AppController {
   }
 
   @Get('files/:id/download')
+  @UseGuards(JwtAuthGuard)
   async downloadFile(
     @Param('id') id: string,
     @Res() res: Response,
+    @Request() req: AuthenticatedRequest,
   ): Promise<void> {
     try {
-      const downloadUrl = await this.appService.getFileDownloadUrl(id);
+      const userId = req.user.id;
+      const downloadUrl = await this.appService.getFileDownloadUrl(id, userId);
       res.redirect(downloadUrl);
     } catch (error) {
       if (error instanceof Error) {
@@ -125,9 +137,14 @@ export class AppController {
   }
 
   @Delete('files/:id')
-  async deleteFile(@Param('id') id: string): Promise<IMessageDto> {
+  @UseGuards(JwtAuthGuard)
+  async deleteFile(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ): Promise<IMessageDto> {
     try {
-      await this.appService.deleteFile(id);
+      const userId = req.user.id;
+      await this.appService.deleteFile(id, userId);
       return new MessageDto('File deleted successfully');
     } catch (error) {
       if (error instanceof Error) {
