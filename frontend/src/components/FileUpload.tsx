@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   Box,
   Button,
@@ -15,7 +15,11 @@ import {
   ToggleButtonGroup,
   Tooltip,
 } from "@mui/material";
-import { FileService, FileUploadResponse } from "../services/file.service";
+import {
+  FileService,
+  FileUploadResponse,
+  FileValidationConfig,
+} from "../services/file.service";
 
 interface FileUploadProps {
   fileService: FileService;
@@ -36,7 +40,24 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [downloadMethod, setDownloadMethod] = useState<"presigned" | "direct">(
     "presigned"
   );
+  const [validationConfig, setValidationConfig] =
+    useState<FileValidationConfig | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadValidationConfig = useCallback(async () => {
+    try {
+      const config = await fileService.getValidationConfig();
+      setValidationConfig(config);
+    } catch (err) {
+      console.error("Error loading validation config:", err);
+    }
+  }, [fileService]);
+
+  const clearFileInput = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
 
   const loadFiles = useCallback(async () => {
     try {
@@ -48,12 +69,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     }
   }, [fileService]);
 
-  // Load files on component mount
-  React.useEffect(() => {
+  // Load validation config and files on component mount
+  useEffect(() => {
     if (!disabled) {
+      loadValidationConfig();
       loadFiles();
     }
-  }, [loadFiles, disabled]);
+  }, [disabled, loadValidationConfig, loadFiles]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -84,13 +106,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       // Refresh file list
       await loadFiles();
 
-      // Clear file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      // Clear file input after successful upload
+      clearFileInput();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const errorMessage = err instanceof Error ? err.message : "Upload failed";
+      setError(errorMessage);
       console.error("Upload error:", err);
+
+      // Clear file input after error so user can select a new file
+      clearFileInput();
     } finally {
       setUploading(false);
     }
@@ -186,6 +210,82 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           </Typography>
         </Box>
 
+        {/* File Validation Rules */}
+        {validationConfig && (
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              bgcolor: "background.paper",
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 1,
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              gutterBottom
+              color="primary"
+              sx={{ fontWeight: "bold" }}
+            >
+              📋 File Upload Requirements
+            </Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                gap: 2,
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: "bold" }}
+                >
+                  Maximum File Size:
+                </Typography>
+                <Typography variant="body2">
+                  {fileService.formatFileSize(validationConfig.maxFileSize)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: "bold" }}
+                >
+                  Maximum File Name Length:
+                </Typography>
+                <Typography variant="body2">
+                  {validationConfig.maxFileNameLength} characters
+                </Typography>
+              </Box>
+              <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: "bold" }}
+                >
+                  Allowed File Types:
+                </Typography>
+                <Box
+                  sx={{ mt: 0.5, display: "flex", flexWrap: "wrap", gap: 0.5 }}
+                >
+                  {validationConfig.allowedExtensions.map((ext) => (
+                    <Chip
+                      key={ext}
+                      label={ext}
+                      size="small"
+                      variant="outlined"
+                    />
+                  ))}
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        )}
+
         <Box sx={{ mb: 2 }}>
           <input
             ref={fileInputRef}
@@ -229,8 +329,30 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         )}
 
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
+          <Alert
+            severity="error"
+            sx={{ mb: 2 }}
+            onClose={() => setError(null)}
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  setError(null);
+                  // Trigger file input click to allow immediate retry
+                  document.getElementById("file-input")?.click();
+                }}
+              >
+                Try Again
+              </Button>
+            }
+          >
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                Upload Failed
+              </Typography>
+              <Typography variant="body2">{error}</Typography>
+            </Box>
           </Alert>
         )}
 

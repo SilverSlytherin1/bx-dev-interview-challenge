@@ -19,9 +19,17 @@ export interface PresignedUploadResponse {
   s3Key: string;
 }
 
+export interface FileValidationConfig {
+  maxFileSize: number; // in bytes
+  allowedMimeTypes: string[];
+  allowedExtensions: string[];
+  maxFileNameLength: number;
+}
+
 export class FileService {
   private readonly baseUrl: string;
   private getAuthHeaders: () => Record<string, string>;
+  private validationConfig: FileValidationConfig | null = null;
 
   constructor(getAuthHeaders: () => Record<string, string>) {
     // Since we have a proxy configured in rsbuild.config.ts, we can use relative URLs
@@ -33,7 +41,7 @@ export class FileService {
   // Main upload method using presigned URLs (default)
   async uploadFile(file: File): Promise<FileUploadResponse> {
     // Validate file before starting upload
-    this.validateFile(file);
+    await this.validateFile(file);
 
     // Step 1: Get presigned URL
     const presignedResponse = await this.getPresignedUploadUrl(
@@ -53,7 +61,7 @@ export class FileService {
 
   // Direct upload through backend (alternative method)
   async uploadFileDirect(file: File): Promise<FileUploadResponse> {
-    this.validateFile(file);
+    await this.validateFile(file);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -73,45 +81,106 @@ export class FileService {
     });
 
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
+      const errorText = await response.text().catch(() => "Unknown error");
+      throw new Error(`Upload failed: ${errorText}`);
     }
 
     return response.json();
   }
 
-  private validateFile(file: File): void {
-    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-    const ALLOWED_TYPES = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "application/pdf",
-      "text/plain",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/zip",
-      "application/json",
-      "text/csv",
-    ];
+  // Get validation configuration from backend
+  async getValidationConfig(): Promise<FileValidationConfig> {
+    if (!this.validationConfig) {
+      const response = await fetch(`${this.baseUrl}/api/files/validation-config`, {
+        headers: this.getAuthHeaders(),
+      });
 
-    if (file.size > MAX_FILE_SIZE) {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch validation config: ${response.statusText}`);
+      }
+
+      this.validationConfig = await response.json();
+    }
+    return this.validationConfig!;
+  }
+
+  private async validateFile(file: File): Promise<void> {
+    // Get validation config from backend
+    const config = await this.getValidationConfig();
+
+    if (file.size <= 0) {
+      throw new Error("File size must be greater than 0");
+    }
+
+    if (file.size > config.maxFileSize) {
+      const maxSizeMB = config.maxFileSize / (1024 * 1024);
       throw new Error(
-        `File size exceeds maximum allowed size of ${
-          MAX_FILE_SIZE / (1024 * 1024)
-        }MB`
+        `File size exceeds maximum allowed size of ${maxSizeMB}MB`
       );
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      throw new Error(`File type ${file.type} is not allowed`);
+    if (!file.type || !config.allowedMimeTypes.includes(file.type.toLowerCase())) {
+      throw new Error(
+        `File type '${file.type}' is not allowed. Allowed types: ${config.allowedMimeTypes.join(', ')}`
+      );
     }
 
     if (!file.name || file.name.trim() === "") {
       throw new Error("File name is required");
     }
+
+    if (file.name.length > config.maxFileNameLength) {
+      throw new Error(
+        `File name exceeds maximum length of ${config.maxFileNameLength} characters`
+      );
+    }
+
+    // Check for dangerous characters (exclude control characters for regex safety)
+    const dangerousChars = /[<>:"/\\|?*]/;
+    if (dangerousChars.test(file.name)) {
+      throw new Error(
+        'File name contains invalid characters'
+      );
+    }
+
+    // Check for reserved names (Windows)
+    const reservedNames = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)/i;
+    if (reservedNames.test(file.name)) {
+      throw new Error(
+        'File name uses a reserved name'
+      );
+    }
+
+    // Validate file extension
+    const extension = this.getFileExtension(file.name);
+    if (!extension) {
+      throw new Error('File must have an extension');
+    }
+
+    if (!config.allowedExtensions.includes(extension.toLowerCase())) {
+      throw new Error(
+        `File extension '${extension}' is not allowed. Allowed extensions: ${config.allowedExtensions.join(', ')}`
+      );
+    }
+  }
+
+  private getFileExtension(fileName: string): string {
+    const lastDotIndex = fileName.lastIndexOf('.');
+    if (lastDotIndex === -1 || lastDotIndex === fileName.length - 1) {
+      return '';
+    }
+    return fileName.substring(lastDotIndex);
+  }
+
+  /**
+   * Format file size for human readability
+   */
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
   private async getPresignedUploadUrl(

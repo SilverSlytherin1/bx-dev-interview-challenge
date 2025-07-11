@@ -108,7 +108,7 @@ export class FileService {
   }> {
     this.logger.log(`Generating presigned URL for file: ${fileName}`);
     this.logger.debug(`Content-Type: ${contentType}, Size: ${contentLength}`);
-    
+
     const fileId = uuidv4();
     const s3Key = `uploads/${fileId}-${fileName}`;
 

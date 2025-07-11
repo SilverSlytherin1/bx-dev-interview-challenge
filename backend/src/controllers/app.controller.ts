@@ -24,11 +24,15 @@ import { IMessageDto, MessageDto } from '../dtos/message.dto';
 import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 import { AppService } from '../services/app/app.service';
 import { JwtAuthGuard } from '../services/auth/jwt-auth.guard';
+import { FileValidationService } from '../services/validation/file-validation.service';
 import { Mapper } from '../utils/mapper/mapper';
 
 @Controller()
 export class AppController {
-  constructor(@Inject(AppService) private readonly appService: AppService) {}
+  constructor(
+    @Inject(AppService) private readonly appService: AppService,
+    private readonly fileValidationService: FileValidationService,
+  ) {}
 
   @Get('hello')
   getHello(): IMessageDto {
@@ -45,9 +49,8 @@ export class AppController {
     @UploadedFile() file: Express.Multer.File,
     @Request() req: AuthenticatedRequest,
   ): Promise<IFileUploadDto> {
-    if (!file) {
-      throw new HttpException('No file provided', HttpStatus.BAD_REQUEST);
-    }
+    // Validate file using the validation service
+    this.fileValidationService.validateMulterFile(file);
 
     try {
       const userId = req.user.id;
@@ -95,36 +98,12 @@ export class AppController {
       const userId = req.user.id;
       const { fileName, contentType, contentLength } = body;
 
-      // Enhanced validation
-      if (!fileName || !contentType) {
-        throw new HttpException(
-          'fileName and contentType are required',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      if (fileName.trim().length === 0) {
-        throw new HttpException(
-          'fileName cannot be empty',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      if (contentLength && contentLength <= 0) {
-        throw new HttpException(
-          'contentLength must be a positive number',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      // Validate file size (100MB limit)
-      const MAX_FILE_SIZE = 100 * 1024 * 1024;
-      if (contentLength && contentLength > MAX_FILE_SIZE) {
-        throw new HttpException(
-          `File size exceeds maximum allowed size of ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      // Validate file metadata using the validation service
+      this.fileValidationService.validateFileMetadata(
+        fileName,
+        contentType,
+        contentLength,
+      );
 
       const presignedData = await this.appService.getPresignedUploadUrl(
         fileName,
@@ -362,5 +341,10 @@ export class AppController {
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
+  }
+
+  @Get('files/validation-config')
+  getFileValidationConfig() {
+    return this.fileValidationService.getValidationConfig();
   }
 }
