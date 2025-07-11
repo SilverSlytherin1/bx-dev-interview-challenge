@@ -1,5 +1,5 @@
-import { IMessageEntity } from '@/entities/message.entity';
-import { IFileEntity } from '@/entities/file.entity';
+import { IMessageEntity } from './message.model';
+import { IFileEntity } from './file.model';
 import { Readable } from 'stream';
 
 export interface IAppService {

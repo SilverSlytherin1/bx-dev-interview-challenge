@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { IMessageEntity, MessageEntity } from '../../entities/message.entity';
-import { IFileEntity } from '../../entities/file.entity';
+import { MessageEntity } from '../../entities/message.entity';
+import { IMessageEntity } from '../../models/message.model';
+import { IFileEntity } from '../../models/file.model';
 import { FileService } from '../file/file.service';
-import { IAppService } from './app.service.interface';
+import { IAppService } from '../../models/app-service.model';
 
 @Injectable()
 export class AppService implements IAppService {

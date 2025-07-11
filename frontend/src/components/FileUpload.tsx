@@ -15,16 +15,7 @@ import {
   ToggleButtonGroup,
   Tooltip,
 } from "@mui/material";
-import {
-  FileService,
-  FileUploadResponse,
-  FileValidationConfig,
-} from "../services/file.service";
-
-interface FileUploadProps {
-  fileService: FileService;
-  disabled?: boolean;
-}
+import { FileUploadResponse, FileValidationConfig, FileUploadProps } from "../models";
 
 export const FileUpload: React.FC<FileUploadProps> = ({
   fileService,
@@ -348,9 +339,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             }
           >
             <Box>
-              <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                Upload Failed
-              </Typography>
+                {error.includes('Upload') || error.includes('upload') ? (
+                <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                  Upload Failed
+                </Typography>
+                ) : null}
               <Typography variant="body2">{error}</Typography>
             </Box>
           </Alert>

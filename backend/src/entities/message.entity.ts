@@ -1,8 +1,5 @@
 import { Expose } from 'class-transformer';
-
-export interface IMessageEntity {
-  message: string;
-}
+import { IMessageEntity } from '../models/message.model';
 
 export class MessageEntity implements IMessageEntity {
   @Expose()

@@ -9,17 +9,7 @@ import {
 } from 'typeorm';
 import { Expose } from 'class-transformer';
 import { User } from './user.entity';
-
-export interface IFileEntity {
-  id: string;
-  fileName: string;
-  originalName: string;
-  size: number;
-  mimeType: string;
-  uploadedAt: Date;
-  s3Key: string;
-  userId?: string;
-}
+import { IFileEntity } from '../models/file.model';
 
 @Entity('files')
 export class FileEntity implements IFileEntity {

@@ -1,11 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-
-export interface FileValidationConfig {
-  maxFileSize: number; // in bytes
-  allowedMimeTypes: string[];
-  allowedExtensions: string[];
-  maxFileNameLength: number;
-}
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { FileValidationConfig } from '../../models/file-validation.model';
 
 @Injectable()
 export class FileValidationService {

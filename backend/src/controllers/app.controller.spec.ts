@@ -2,7 +2,7 @@ import { Mocked, TestBed } from '@suites/unit';
 import { MessageDto } from '../dtos/message.dto';
 import { MessageEntity } from '../entities/message.entity';
 import { AppService } from '../services/app/app.service';
-import { IAppService } from '../services/app/app.service.interface';
+import { IAppService } from '../models/app-service.model';
 import { Mapper } from '../utils/mapper/mapper';
 import { AppController } from './app.controller';
 

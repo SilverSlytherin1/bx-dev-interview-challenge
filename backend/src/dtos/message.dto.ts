@@ -1,8 +1,5 @@
 import { Expose } from 'class-transformer';
-
-export interface IMessageDto {
-  message: string;
-}
+import { IMessageDto } from '../models/dto.model';
 
 export class MessageDto implements IMessageDto {
   @Expose()

@@ -18,10 +18,11 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response as ExpressResponse } from 'express';
-import { FileListDto, IFileListDto } from '../dtos/file-list.dto';
-import { FileUploadDto, IFileUploadDto } from '../dtos/file-upload.dto';
-import { IMessageDto, MessageDto } from '../dtos/message.dto';
-import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
+import { FileListDto } from '../dtos/file-list.dto';
+import { FileUploadDto } from '../dtos/file-upload.dto';
+import { MessageDto } from '../dtos/message.dto';
+import { IFileListDto, IFileUploadDto, IMessageDto } from '../models/dto.model';
+import { AuthenticatedRequest } from '../models/authenticated-request.model';
 import { AppService } from '../services/app/app.service';
 import { JwtAuthGuard } from '../services/auth/jwt-auth.guard';
 import { FileValidationService } from '../services/validation/file-validation.service';

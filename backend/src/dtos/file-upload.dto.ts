@@ -1,15 +1,6 @@
 import { Expose } from 'class-transformer';
 import { IsString, IsNumber, IsOptional, IsDateString } from 'class-validator';
-
-export interface IFileUploadDto {
-  id: string;
-  fileName: string;
-  originalName: string;
-  size: number;
-  mimeType: string;
-  uploadedAt: Date;
-  downloadUrl?: string;
-}
+import { IFileUploadDto } from '../models/dto.model';
 
 export class FileUploadDto implements IFileUploadDto {
   @Expose()

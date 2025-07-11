@@ -1,7 +1,7 @@
 import { TestBed } from '@suites/unit';
 import { MessageEntity } from '../../entities/message.entity';
 import { AppService } from './app.service';
-import { IAppService } from './app.service.interface';
+import { IAppService } from '../../models/app-service.model';
 
 describe('AppService', () => {
   let appService: IAppService;

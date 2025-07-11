@@ -13,17 +13,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { useAuth } from "../contexts/AuthContext";
-
-interface AuthDialogProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
+import { AuthDialogProps, TabPanelProps } from "../models";
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
