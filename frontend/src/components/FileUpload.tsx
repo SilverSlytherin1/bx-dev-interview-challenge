@@ -88,9 +88,41 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     }
   };
 
-  const handleDownload = (fileId: string) => {
-    const downloadUrl = fileService.getDownloadUrl(fileId);
-    window.open(downloadUrl, "_blank");
+  const handleDownload = async (fileId: string, fileName: string) => {
+    try {
+      // Option 1: Use presigned URL for direct S3 download
+      const downloadUrl = await fileService.getDownloadUrl(fileId);
+      
+      // Create a temporary link element to trigger download
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = fileName;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.warn("Presigned URL download failed, falling back to blob download:", error);
+      
+      // Option 2: Fallback to blob download through backend
+      try {
+        const data = await fileService.getDownloadBlob(fileId);
+        const url = window.URL.createObjectURL(new Blob([data]));
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the blob URL
+        window.URL.revokeObjectURL(url);
+      } catch (blobError) {
+        setError("Failed to download file");
+        console.error("Download error:", blobError);
+      }
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -214,7 +246,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                   <IconButton
                     edge="end"
                     aria-label="download"
-                    onClick={() => handleDownload(file.id)}
+                    onClick={() => handleDownload(file.id, file.originalName)}
                     sx={{ mr: 1 }}
                     disabled={disabled}
                   >

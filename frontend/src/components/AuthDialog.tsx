@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -11,8 +11,8 @@ import {
   Box,
   Alert,
   CircularProgress,
-} from '@mui/material';
-import { useAuth } from '../contexts/AuthContext';
+} from "@mui/material";
+import { useAuth } from "../contexts/AuthContext";
 
 interface AuthDialogProps {
   open: boolean;
@@ -49,32 +49,92 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
 
   // Login form state
   const [loginData, setLoginData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
 
   // Register form state
   const [registerData, setRegisterData] = useState({
-    email: '',
-    password: '',
-    firstName: '',
-    lastName: '',
+    email: "",
+    password: "",
+    firstName: "",
+    lastName: "",
   });
+
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, string>
+  >({});
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
     setError(null);
+    setValidationErrors({});
+  };
+
+  const validateEmail = (email: string): string | null => {
+    if (!email.trim()) {
+      return "Email is required";
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return "Please enter a valid email address";
+    }
+    return null;
+  };
+
+  const validatePassword = (password: string): string | null => {
+    if (!password) {
+      return "Password is required";
+    }
+    if (password.length < 6) {
+      return "Password must be at least 6 characters long";
+    }
+    return null;
+  };
+
+  const validateLoginForm = () => {
+    const errors: Record<string, string> = {};
+
+    const emailError = validateEmail(loginData.email);
+    if (emailError) errors.email = emailError;
+
+    const passwordError = validatePassword(loginData.password);
+    if (passwordError) errors.password = passwordError;
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateRegisterForm = () => {
+    const errors: Record<string, string> = {};
+
+    const emailError = validateEmail(registerData.email);
+    if (emailError) errors.email = emailError;
+
+    const passwordError = validatePassword(registerData.password);
+    if (passwordError) errors.password = passwordError;
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleClose = () => {
     setError(null);
-    setLoginData({ email: '', password: '' });
-    setRegisterData({ email: '', password: '', firstName: '', lastName: '' });
+    setTabValue(0);
+    setValidationErrors({});
+    setLoginData({ email: "", password: "" });
+    setRegisterData({ email: "", password: "", firstName: "", lastName: "" });
     onClose();
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateLoginForm()) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -82,7 +142,7 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
       await login(loginData);
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }
@@ -90,6 +150,11 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateRegisterForm()) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -97,7 +162,7 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
       await register(registerData);
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -108,7 +173,11 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
       <DialogTitle>
         <Tabs value={tabValue} onChange={handleTabChange} centered>
           <Tab label="Login" id="auth-tab-0" aria-controls="auth-tabpanel-0" />
-          <Tab label="Register" id="auth-tab-1" aria-controls="auth-tabpanel-1" />
+          <Tab
+            label="Register"
+            id="auth-tab-1"
+            aria-controls="auth-tabpanel-1"
+          />
         </Tabs>
       </DialogTitle>
 
@@ -126,13 +195,17 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
               required
               fullWidth
               id="login-email"
-              label="Email Address"
+              label="Email"
               name="email"
               autoComplete="email"
               autoFocus
               value={loginData.email}
-              onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+              onChange={(e) =>
+                setLoginData({ ...loginData, email: e.target.value })
+              }
               disabled={loading}
+              error={!!validationErrors.email}
+              helperText={validationErrors.email}
             />
             <TextField
               margin="normal"
@@ -144,8 +217,12 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
               id="login-password"
               autoComplete="current-password"
               value={loginData.password}
-              onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+              onChange={(e) =>
+                setLoginData({ ...loginData, password: e.target.value })
+              }
               disabled={loading}
+              error={!!validationErrors.password}
+              helperText={validationErrors.password}
             />
           </Box>
         </TabPanel>
@@ -157,13 +234,17 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
               required
               fullWidth
               id="register-email"
-              label="Email Address"
+              label="Email"
               name="email"
               autoComplete="email"
               autoFocus
               value={registerData.email}
-              onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+              onChange={(e) =>
+                setRegisterData({ ...registerData, email: e.target.value })
+              }
               disabled={loading}
+              error={!!validationErrors.email}
+              helperText={validationErrors.email}
             />
             <TextField
               margin="normal"
@@ -175,8 +256,12 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
               id="register-password"
               autoComplete="new-password"
               value={registerData.password}
-              onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+              onChange={(e) =>
+                setRegisterData({ ...registerData, password: e.target.value })
+              }
               disabled={loading}
+              error={!!validationErrors.password}
+              helperText={validationErrors.password}
             />
             <TextField
               margin="normal"
@@ -186,7 +271,9 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
               name="firstName"
               autoComplete="given-name"
               value={registerData.firstName}
-              onChange={(e) => setRegisterData({ ...registerData, firstName: e.target.value })}
+              onChange={(e) =>
+                setRegisterData({ ...registerData, firstName: e.target.value })
+              }
               disabled={loading}
             />
             <TextField
@@ -197,7 +284,9 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
               name="lastName"
               autoComplete="family-name"
               value={registerData.lastName}
-              onChange={(e) => setRegisterData({ ...registerData, lastName: e.target.value })}
+              onChange={(e) =>
+                setRegisterData({ ...registerData, lastName: e.target.value })
+              }
               disabled={loading}
             />
           </Box>
@@ -212,19 +301,19 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ open, onClose }) => {
           <Button
             onClick={handleLogin}
             variant="contained"
-            disabled={loading || !loginData.email || !loginData.password}
+            disabled={loading}
             startIcon={loading ? <CircularProgress size={20} /> : undefined}
           >
-            {loading ? 'Signing in...' : 'Login'}
+            {loading ? "Signing in..." : "Login"}
           </Button>
         ) : (
           <Button
             onClick={handleRegister}
             variant="contained"
-            disabled={loading || !registerData.email || !registerData.password}
+            disabled={loading}
             startIcon={loading ? <CircularProgress size={20} /> : undefined}
           >
-            {loading ? 'Creating account...' : 'Register'}
+            {loading ? "Creating account..." : "Register"}
           </Button>
         )}
       </DialogActions>
