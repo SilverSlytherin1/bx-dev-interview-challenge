@@ -11,6 +11,9 @@ import {
   ListItem,
   ListItemText,
   Chip,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
 } from "@mui/material";
 import { FileService, FileUploadResponse } from "../services/file.service";
 
@@ -27,6 +30,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [files, setFiles] = useState<FileUploadResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [uploadMethod, setUploadMethod] = useState<"presigned" | "direct">(
+    "presigned"
+  );
+  const [downloadMethod, setDownloadMethod] = useState<"presigned" | "direct">(
+    "presigned"
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadFiles = useCallback(async () => {
@@ -59,8 +68,18 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     setSuccess(null);
 
     try {
-      await fileService.uploadFile(file);
-      setSuccess(`File "${file.name}" uploaded successfully!`);
+      // Use the selected upload method
+      if (uploadMethod === "direct") {
+        await fileService.uploadFileDirect(file);
+        setSuccess(
+          `File "${file.name}" uploaded successfully via direct upload!`
+        );
+      } else {
+        await fileService.uploadFile(file);
+        setSuccess(
+          `File "${file.name}" uploaded successfully via presigned URL!`
+        );
+      }
 
       // Refresh file list
       await loadFiles();
@@ -90,38 +109,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
   const handleDownload = async (fileId: string, fileName: string) => {
     try {
-      // Option 1: Use presigned URL for direct S3 download
-      const downloadUrl = await fileService.getDownloadUrl(fileId);
-      
-      // Create a temporary link element to trigger download
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = fileName;
-      link.target = "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      await fileService.downloadFile(fileId, fileName, downloadMethod);
+      const methodText =
+        downloadMethod === "direct" ? "direct download" : "presigned URL";
+      setSuccess(
+        `File "${fileName}" downloaded successfully via ${methodText}!`
+      );
     } catch (error) {
-      console.warn("Presigned URL download failed, falling back to blob download:", error);
-      
-      // Option 2: Fallback to blob download through backend
-      try {
-        const data = await fileService.getDownloadBlob(fileId);
-        const url = window.URL.createObjectURL(new Blob([data]));
-        
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Clean up the blob URL
-        window.URL.revokeObjectURL(url);
-      } catch (blobError) {
-        setError("Failed to download file");
-        console.error("Download error:", blobError);
-      }
+      setError(error instanceof Error ? error.message : "Download failed");
+      console.error("Download error:", error);
     }
   };
 
@@ -150,6 +146,45 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         <Typography variant="h5" gutterBottom>
           File Upload
         </Typography>
+
+        {/* Upload Method Selection */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Upload Method:
+          </Typography>
+          <ToggleButtonGroup
+            value={uploadMethod}
+            exclusive
+            onChange={(_, newMethod) => {
+              if (newMethod !== null) {
+                setUploadMethod(newMethod);
+              }
+            }}
+            size="small"
+            disabled={uploading || disabled}
+          >
+            <ToggleButton value="presigned">
+              <Tooltip title="Direct upload to S3 using presigned URLs - faster and more efficient">
+                <Box>🚀 Presigned URL</Box>
+              </Tooltip>
+            </ToggleButton>
+            <ToggleButton value="direct">
+              <Tooltip title="Upload through backend server - more traditional approach">
+                <Box>🔄 Direct Upload</Box>
+              </Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
+          <Typography
+            variant="caption"
+            display="block"
+            color="text.secondary"
+            sx={{ mt: 1 }}
+          >
+            {uploadMethod === "presigned"
+              ? "Files are uploaded directly to S3 using secure presigned URLs for optimal performance"
+              : "Files are uploaded through the backend server for traditional processing"}
+          </Typography>
+        </Box>
 
         <Box sx={{ mb: 2 }}>
           <input
@@ -181,7 +216,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           <Box sx={{ mb: 2 }}>
             <LinearProgress />
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Uploading file to S3...
+              {uploadMethod === "presigned"
+                ? "Uploading file directly to S3 using presigned URL..."
+                : "Uploading file through backend server..."}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {uploadMethod === "presigned"
+                ? "This secure method uploads files directly to cloud storage without going through our servers"
+                : "Traditional upload method that processes files through the backend before storing in S3"}
             </Typography>
           </Box>
         )}
@@ -205,9 +247,47 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
       {/* File List Section */}
       <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom>
-          Uploaded Files ({files.length})
-        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 2,
+          }}
+        >
+          <Typography variant="h5">Uploaded Files ({files.length})</Typography>
+
+          {/* Download Method Selection */}
+          {files.length > 0 && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Download Method:
+              </Typography>
+              <ToggleButtonGroup
+                value={downloadMethod}
+                exclusive
+                onChange={(_, newMethod) => {
+                  if (newMethod !== null) {
+                    setDownloadMethod(newMethod);
+                  }
+                }}
+                size="small"
+                disabled={disabled}
+              >
+                <ToggleButton value="presigned">
+                  <Tooltip title="Get presigned download URLs - faster with automatic fallback">
+                    <Box sx={{ fontSize: "0.75rem" }}>🔗 Presigned</Box>
+                  </Tooltip>
+                </ToggleButton>
+                <ToggleButton value="direct">
+                  <Tooltip title="Download through backend server - more reliable but slower">
+                    <Box sx={{ fontSize: "0.75rem" }}>📥 Direct</Box>
+                  </Tooltip>
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+          )}
+        </Box>
 
         {files.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
@@ -236,6 +316,34 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                         variant="outlined"
                         sx={{ mr: 1 }}
                       />
+                      <Chip
+                        label="🔒 Secure S3"
+                        size="small"
+                        color="success"
+                        variant="outlined"
+                        sx={{ mr: 1 }}
+                        title="File stored securely in S3 with presigned URL access"
+                      />
+                      <Chip
+                        label={
+                          downloadMethod === "presigned"
+                            ? "🚀 Fast Download"
+                            : "🛡️ Secure Download"
+                        }
+                        size="small"
+                        color={
+                          downloadMethod === "presigned"
+                            ? "primary"
+                            : "secondary"
+                        }
+                        variant="outlined"
+                        sx={{ mr: 1 }}
+                        title={
+                          downloadMethod === "presigned"
+                            ? "Using presigned URLs for fast downloads with automatic fallback"
+                            : "Using direct backend download for maximum security"
+                        }
+                      />
                       <Typography variant="caption" display="block">
                         Uploaded: {formatDate(file.uploadedAt)}
                       </Typography>
@@ -243,24 +351,34 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                   }
                 />
                 <ListItem secondaryAction>
-                  <IconButton
-                    edge="end"
-                    aria-label="download"
-                    onClick={() => handleDownload(file.id, file.originalName)}
-                    sx={{ mr: 1 }}
-                    disabled={disabled}
+                  <Tooltip
+                    title={`Download via ${
+                      downloadMethod === "presigned"
+                        ? "presigned URL (fast)"
+                        : "direct download (secure)"
+                    }`}
                   >
-                    ⬇️
-                  </IconButton>
-                  <IconButton
-                    edge="end"
-                    aria-label="delete"
-                    onClick={() => handleDelete(file.id, file.originalName)}
-                    color="error"
-                    disabled={disabled}
-                  >
-                    🗑️
-                  </IconButton>
+                    <IconButton
+                      edge="end"
+                      aria-label="download"
+                      onClick={() => handleDownload(file.id, file.originalName)}
+                      sx={{ mr: 1 }}
+                      disabled={disabled}
+                    >
+                      {downloadMethod === "presigned" ? "⚡" : "📥"}
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete file permanently">
+                    <IconButton
+                      edge="end"
+                      aria-label="delete"
+                      onClick={() => handleDelete(file.id, file.originalName)}
+                      color="error"
+                      disabled={disabled}
+                    >
+                      🗑️
+                    </IconButton>
+                  </Tooltip>
                 </ListItem>
               </ListItem>
             ))}

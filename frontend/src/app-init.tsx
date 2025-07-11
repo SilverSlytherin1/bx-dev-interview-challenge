@@ -104,9 +104,11 @@ function App() {
                     System Status
                   </Typography>
                   <Typography variant="body2">
-                    ✅ File Upload to S3 configured
+                    ✅ File Upload to S3 configured (Presigned URLs + Direct)
                     <br />
-                    ✅ Secure Download URLs
+                    ✅ Secure Download URLs (Presigned URLs + Direct)
+                    <br />
+                    ✅ Multiple Upload Methods (Choose your preferred approach)
                     <br />
                     ✅ File Management (Delete)
                     <br />

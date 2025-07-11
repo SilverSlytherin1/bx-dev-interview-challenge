@@ -30,16 +30,20 @@ export class FileService {
     this.getAuthHeaders = getAuthHeaders;
   }
 
+  // Main upload method using presigned URLs (default)
   async uploadFile(file: File): Promise<FileUploadResponse> {
+    // Validate file before starting upload
+    this.validateFile(file);
+
     // Step 1: Get presigned URL
     const presignedResponse = await this.getPresignedUploadUrl(
       file.name,
       file.type,
-      file.size,
+      file.size
     );
 
-    // Step 2: Upload directly to S3 using presigned URL
-    await this.uploadToS3(file, presignedResponse);
+    // Step 2: Upload directly to S3 using presigned URL with retry logic
+    await this.uploadToS3WithRetry(file, presignedResponse);
 
     // Step 3: Confirm upload with backend
     const confirmResponse = await this.confirmUpload(presignedResponse.fileId);
@@ -47,10 +51,73 @@ export class FileService {
     return confirmResponse;
   }
 
+  // Direct upload through backend (alternative method)
+  async uploadFileDirect(file: File): Promise<FileUploadResponse> {
+    this.validateFile(file);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const authHeaders = this.getAuthHeaders();
+    const headers: Record<string, string> = {};
+
+    // Only add Authorization header, not Content-Type for FormData
+    if (authHeaders.Authorization) {
+      headers.Authorization = authHeaders.Authorization;
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/upload`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  private validateFile(file: File): void {
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    const ALLOWED_TYPES = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/zip",
+      "application/json",
+      "text/csv",
+    ];
+
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(
+        `File size exceeds maximum allowed size of ${
+          MAX_FILE_SIZE / (1024 * 1024)
+        }MB`
+      );
+    }
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      throw new Error(`File type ${file.type} is not allowed`);
+    }
+
+    if (!file.name || file.name.trim() === "") {
+      throw new Error("File name is required");
+    }
+  }
+
   private async getPresignedUploadUrl(
     fileName: string,
     contentType: string,
-    contentLength: number,
+    contentLength: number
   ): Promise<PresignedUploadResponse> {
     const response = await fetch(`${this.baseUrl}/api/upload/presigned`, {
       method: "POST",
@@ -72,59 +139,73 @@ export class FileService {
     return response.json();
   }
 
-  private async uploadToS3(
+  private async uploadToS3WithRetry(
     file: File,
     presignedData: PresignedUploadResponse,
+    maxRetries: number = 3
+  ): Promise<void> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.uploadToS3(file, presignedData);
+        return; // Success, exit retry loop
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Upload failed");
+        console.warn(`Upload attempt ${attempt} failed:`, lastError.message);
+
+        if (attempt === maxRetries) {
+          break; // Don't wait after the last attempt
+        }
+
+        // Wait before retrying (exponential backoff)
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+    }
+
+    throw new Error(
+      `Upload failed after ${maxRetries} attempts: ${
+        lastError?.message || "Unknown error"
+      }`
+    );
+  }
+
+  private async uploadToS3(
+    file: File,
+    presignedData: PresignedUploadResponse
   ): Promise<void> {
     const { uploadUrl } = presignedData;
 
+    // For presigned URLs, we should not set any headers that weren't included in the signature
+    // The Content-Type was already included when generating the presigned URL
     const response = await fetch(uploadUrl, {
       method: "PUT",
-      headers: {
-        "Content-Type": file.type,
-      },
       body: file,
     });
 
     if (!response.ok) {
-      throw new Error(`S3 upload failed: ${response.statusText}`);
+      const errorText = await response.text().catch(() => "Unknown error");
+      throw new Error(`S3 upload failed (${response.status}): ${errorText}`);
+    }
+
+    // Verify the response
+    if (response.status !== 200) {
+      throw new Error(`Unexpected response status: ${response.status}`);
     }
   }
 
   private async confirmUpload(fileId: string): Promise<FileUploadResponse> {
-    const response = await fetch(`${this.baseUrl}/api/upload/${fileId}/confirm`, {
-      method: "PUT",
-      headers: this.getAuthHeaders(),
-    });
+    const response = await fetch(
+      `${this.baseUrl}/api/upload/${fileId}/confirm`,
+      {
+        method: "PUT",
+        headers: this.getAuthHeaders(),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to confirm upload: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  // Keep the legacy method for backward compatibility
-  async uploadFileLegacy(file: File): Promise<FileUploadResponse> {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const authHeaders = this.getAuthHeaders();
-    const headers: Record<string, string> = {};
-
-    // Only add Authorization header, not Content-Type for FormData
-    if (authHeaders.Authorization) {
-      headers.Authorization = authHeaders.Authorization;
-    }
-
-    const response = await fetch(`${this.baseUrl}/api/upload`, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
     }
 
     return response.json();
@@ -163,29 +244,115 @@ export class FileService {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to get download URL: ${response.statusText}`);
+      const errorText = await response.text().catch(() => "Unknown error");
+      throw new Error(
+        `Failed to get download URL (${response.status}): ${errorText}`
+      );
     }
 
     const data = await response.json();
+
+    if (!data.url) {
+      throw new Error("Download URL not provided in response");
+    }
+
     return data.url;
   }
 
+  // Direct download through backend (alternative method)
   async getDownloadBlob(
-    fileId: string
+    fileId: string,
+    method: "direct" | "presigned" = "presigned"
   ): Promise<Blob> {
-    const response = await fetch(
-      `${this.baseUrl}/api/files/${fileId}/download`,
-      {
-        method: "GET",
-        headers: this.getAuthHeaders(),
-      }
-    );
-    const data = await response.blob();
-    console.log("Download URL response:", data);
+    const url =
+      method === "direct"
+        ? `${this.baseUrl}/api/files/${fileId}/download?method=direct`
+        : `${this.baseUrl}/api/files/${fileId}/download`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: this.getAuthHeaders(),
+    });
 
     if (!response.ok) {
-      throw new Error(`Failed to get download URL: ${response.statusText}`);
+      const errorText = await response.text().catch(() => "Unknown error");
+      throw new Error(
+        `Failed to download file (${response.status}): ${errorText}`
+      );
     }
-    return data;
+
+    const blob = await response.blob();
+
+    if (blob.size === 0) {
+      throw new Error("Downloaded file is empty");
+    }
+
+    return blob;
+  }
+
+  // Main download method with multiple options
+  async downloadFile(
+    fileId: string,
+    fileName: string,
+    method: "presigned" | "direct" = "presigned"
+  ): Promise<void> {
+    try {
+      if (method === "presigned") {
+        // Try presigned URL first (faster, more efficient)
+        const downloadUrl = await this.getDownloadUrl(fileId);
+
+        // Create temporary link and trigger download
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = fileName;
+        link.target = "_blank";
+        link.style.display = "none";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Direct download through backend
+        const blob = await this.getDownloadBlob(fileId, "direct");
+        const url = window.URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.style.display = "none";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Clean up the blob URL
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      if (method === "presigned") {
+        console.warn(
+          "Presigned URL download failed, falling back to direct download:",
+          error
+        );
+
+        // Fallback to direct download
+        const blob = await this.getDownloadBlob(fileId, "direct");
+        const url = window.URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.style.display = "none";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Clean up the blob URL
+        window.URL.revokeObjectURL(url);
+      } else {
+        throw error;
+      }
+    }
   }
 }

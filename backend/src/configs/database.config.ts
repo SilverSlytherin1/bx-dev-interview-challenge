@@ -9,7 +9,7 @@ export const typeOrmConfig = (
   type: 'postgres',
   url: configService.get<string>('DATABASE_URL'),
   entities: [User, FileEntity],
-  synchronize: configService.get<string>('NODE_ENV') === 'development',
+  synchronize: configService.get<string>('NODE_ENV') === 'production',
   logging: configService.get<string>('NODE_ENV') === 'development',
-  ssl: configService.get<string>('NODE_ENV') === 'production',
+  // ssl: configService.get<string>('NODE_ENV') === 'production',
 });

@@ -22,8 +22,50 @@ export class AppService implements IAppService {
     return await this.fileService.uploadFile(file, userId);
   }
 
-  async getFileDownloadUrl(fileId: string, userId?: string): Promise<string> {
+  async getPresignedUploadUrl(
+    fileName: string,
+    contentType: string,
+    contentLength?: number,
+    userId?: string,
+  ): Promise<{
+    uploadUrl: string;
+    fields: Record<string, string>;
+    fileId: string;
+    s3Key: string;
+  }> {
+    return await this.fileService.getPresignedUploadUrl(
+      fileName,
+      contentType,
+      contentLength,
+      userId,
+    );
+  }
+
+  async confirmUpload(fileId: string, userId?: string): Promise<IFileEntity> {
+    return await this.fileService.confirmUpload(fileId, userId);
+  }
+
+  async getFileDownloadUrl(
+    fileId: string,
+    userId?: string,
+  ): Promise<{ mimetype: string; url: string; originalName: string }> {
     return await this.fileService.getFileDownloadUrl(fileId, userId);
+  }
+
+  async getFileStream(
+    fileId: string,
+    userId?: string,
+  ): Promise<{
+    stream: import('stream').Readable;
+    mimetype: string;
+    originalName: string;
+    size: number;
+  } | null> {
+    try {
+      return await this.fileService.getFileStream(fileId, userId);
+    } catch {
+      return null;
+    }
   }
 
   listFiles(userId?: string): Promise<IFileEntity[]> {
@@ -32,5 +74,10 @@ export class AppService implements IAppService {
 
   async deleteFile(fileId: string, userId?: string): Promise<void> {
     return await this.fileService.deleteFile(fileId, userId);
+  }
+
+  async checkS3Health(): Promise<void> {
+    // Delegate to file service which uses S3 service
+    return await this.fileService.checkS3Health();
   }
 }

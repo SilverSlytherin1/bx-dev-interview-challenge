@@ -1,9 +1,3 @@
--- Create the database if it doesn't exist
-CREATE DATABASE IF NOT EXISTS bonusx_db;
-
--- Connect to the database
-\c bonusx_db;
-
 -- Create extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
